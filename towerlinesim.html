@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Towerline Sim — Browser ATC Simulator</title>
+  <style>
+    :root {
+      --bg: #0b1016;
+      --panel: #131b24;
+      --border: #243242;
+      --text: #e2e8f0;
+      --muted: #8b9bb0;
+      --accent: #38bdf8;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand h1 {
+      font-size: 1.15rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .badge {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .controls-top {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    select, button, input {
+      background: #1b2634;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s ease;
+    }
+
+    button:hover { border-color: var(--accent); }
+
+    main {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .radar-container {
+      position: relative;
+      background: radial-gradient(circle at center, #0f1923 0%, #080c10 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .hud-overlay {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(19, 27, 36, 0.85);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      pointer-events: none;
+    }
+
+    .sidebar {
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .section-title {
+      padding: 10px 14px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.2);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .flight-strips {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 36%;
+      overflow-y: auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .strip {
+      background: #1a2430;
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .strip.arrival { border-left-color: var(--amber); }
+    .strip.departure { border-left-color: var(--green); }
+
+    .strip-info strong { font-size: 0.9rem; color: #fff; }
+    .strip-status {
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .radio-log {
+      flex: 1;
+      padding: 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .msg {
+      padding: 8px 10px;
+      border-radius: 6px;
+      line-height: 1.4;
+    }
+
+    .msg.pilot {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 3px solid var(--accent);
+    }
+
+    .msg.atc {
+      background: rgba(34, 197, 94, 0.1);
+      border-left: 3px solid var(--green);
+    }
+
+    .msg.system {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-style: italic;
+    }
+
+    .radio-controls {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      background: #0e151d;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ptt-btn {
+      width: 100%;
+      padding: 12px;
+      font-size: 0.95rem;
+      background: #1d2b3a;
+      border: 1px solid var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .ptt-btn.listening {
+      background: var(--red);
+      border-color: #fca5a5;
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .text-cmd {
+      display: flex;
+      gap: 6px;
+    }
+
+    .text-cmd input { flex: 1; }
+
+    .phraseology-hint {
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Towerline Sim</h1>
+    <span class="badge" id="airportBadge">KSDL • SCOTTSDALE TOWER</span>
+  </div>
+  <div class="controls-top">
+    <select id="airportSelect" title="Select Airport">
+      <option value="KSDL">Scottsdale (KSDL) — RWY 03/21</option>
+      <option value="KPHX">Phoenix Sky Harbor (KPHX) — RWY 08/26</option>
+      <option value="KLAX">Los Angeles Intl (KLAX) — RWY 24R/06L</option>
+      <option value="KDCA">Reagan National (KDCA) — RWY 01/19</option>
+    </select>
+    <button id="spawnBtn">+ Spawn Traffic</button>
+  </div>
+</header>
+
+<main>
+  <div class="radar-container">
+    <canvas id="radarCanvas"></canvas>
+    <div class="hud-overlay" id="hudInfo">
+      ATIS INFO BRAVO<br>
+      WIND 210 AT 08KT<br>
+      ALT 29.92 INHG<br>
+      ACTIVE RWY: <span id="activeRwyHud">21</span>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="section-title">
+      <span>Flight Strips</span>
+      <span id="trafficCount">0 Aircraft</span>
+    </div>
+    <div class="flight-strips" id="stripContainer"></div>
+
+    <div class="section-title">
+      <span>Tower Frequency 119.90</span>
+      <span id="voiceStatus">Mic Ready</span>
+    </div>
+    <div class="radio-log" id="radioLog"></div>
+
+    <div class="radio-controls">
+      <button class="ptt-btn" id="pttBtn">🎙️ Hold Space or Click to Talk (PTT)</button>
+      <div class="text-cmd">
+        <input type="text" id="cmdInput" placeholder="Or type command (e.g., Delta 412 cleared for takeoff)..." />
+        <button id="sendCmdBtn">TX</button>
+      </div>
+      <div class="phraseology-hint">
+        <strong>Try saying:</strong> "[Callsign] pushback approved", "[Callsign] taxi to runway", "[Callsign] line up and wait", "[Callsign] cleared for takeoff", "[Callsign] cleared to land", "[Callsign] go around"
+      </div>
+    </div>
+  </aside>
+</main>
+
+<script>
+  const AIRPORTS = {
+    KSDL: { name: "Scottsdale Tower", rwy: "21", heading: 210, freq: "119.90" },
+    KPHX: { name: "Phoenix Tower", rwy: "26", heading: 260, freq: "118.70" },
+    KLAX: { name: "Los Angeles Tower", rwy: "24R", heading: 240, freq: "133.90" },
+    KDCA: { name: "Washington Tower", rwy: "19", heading: 190, freq: "119.10" }
+  };
+
+  const AIRLINES = [
+    { name: "Delta", spoken: "Delta" },
+    { name: "Southwest", spoken: "Southwest" },
+    { name: "American", spoken: "American" },
+    { name: "United", spoken: "United" },
+    { name: "SkyWest", spoken: "SkyWest" },
+    { name: "November", spoken: "November" }
+  ];
+
+  let currentAirport = AIRPORTS.KSDL;
+  let aircraftList = [];
+  let isListening = false;
+
+  const canvas = document.getElementById("radarCanvas");
+  const ctx = canvas.getContext("2d");
+  const radioLog = document.getElementById("radioLog");
+  const stripContainer = document.getElementById("stripContainer");
+  const pttBtn = document.getElementById("pttBtn");
+  const voiceStatus = document.getElementById("voiceStatus");
+
+  function resizeCanvas() {
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  function pilotSpeak(callsign, text, pitch = 1.0) {
+    addLog("PILOT", `${callsign}: "${text}"`);
+    if ("speechSynthesis" in window) {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 1.08;
+      utter.pitch = pitch;
+      window.speechSynthesis.speak(utter);
+    }
+  }
+
+  function addLog(type, text) {
+    const div = document.createElement("div");
+    div.className = `msg ${type.toLowerCase()}`;
+    const time = new Date().toTimeString().slice(0, 5);
+    div.textContent = type === "SYSTEM" ? text : `[${time}] ${text}`;
+    radioLog.appendChild(div);
+    radioLog.scrollTop = radioLog.scrollHeight;
+  }
+
+  function spawnAircraft(forcedType = null) {
+    const airline = AIRLINES[Math.floor(Math.random() * AIRLINES.length)];
+    const num = Math.floor(100 + Math.random() * 899);
+    const callsign = `${airline.name} ${num}`;
+    const type = forcedType || (Math.random() > 0.5 ? "DEPARTURE" : "ARRIVAL");
+    const pitch = 0.85 + Math.random() * 0.35;
+
+    const ac = {
+      id: Date.now() + Math.random(),
+      callsign,
+      num: String(num),
+      airline: airline.name.toLowerCase(),
+      type,
+      pitch,
+      state: type === "DEPARTURE" ? "AT_GATE" : "FINAL_APPROACH",
+      x: type === "DEPARTURE" ? -110 : 340,
+      y: type === "DEPARTURE" ? 90 + (aircraftList.length * 25) % 100 : 0,
+      speed: type === "DEPARTURE" ? 0 : 1.4,
+      altitude: type === "DEPARTURE" ? 0 : 3200
+    };
+
+    aircraftList.push(ac);
+    updateStrips();
+
+    setTimeout(() => {
+      if (ac.type === "DEPARTURE") {
+        pilotSpeak(ac.callsign, `${currentAirport.name}, ${ac.callsign} at the ramp with Bravo, ready for pushback.`, ac.pitch);
+      } else {
+        pilotSpeak(ac.callsign, `${currentAirport.name}, ${ac.callsign} is 8 miles final runway ${currentAirport.rwy}.`, ac.pitch);
+      }
+    }, 500);
+  }
+
+  function updateStrips() {
+    stripContainer.innerHTML = "";
+    document.getElementById("trafficCount").textContent = `${aircraftList.length} Aircraft`;
+    aircraftList.forEach(ac => {
+      const div = document.createElement("div");
+      div.className = `strip ${ac.type.toLowerCase()}`;
+      div.innerHTML = `
+        <div class="strip-info">
+          <strong>${ac.callsign}</strong> (${ac.type === "DEPARTURE" ? "DEP" : "ARR"})<br>
+          <span style="color:#8b9bb0">${ac.altitude > 0 ? Math.round(ac.altitude) + " FT" : "GND"} • RWY ${currentAirport.rwy}</span>
+        </div>
+        <span class="strip-status">${ac.state.replace(/_/g, " ")}</span>
+      `;
+      stripContainer.appendChild(div);
+    });
+  }
+
+  function processATCCommand(rawText) {
+    const cmd = rawText.toLowerCase().trim();
+    if (!cmd) return;
+    addLog("ATC", `TOWER: "${rawText}"`);
+
+    const target = aircraftList.find(ac =>
+      cmd.includes(ac.num) || (cmd.includes(ac.airline) && aircraftList.filter(a => a.airline === ac.airline).length === 1)
+    );
+
+    if (!target) {
+      addLog("SYSTEM", "No matching aircraft callsign heard on frequency. Include flight number (e.g. '412').");
+      return;
+    }
+
+    const rwy = currentAirport.rwy;
+
+    if (cmd.includes("push") || cmd.includes("pushback")) {
+      target.state = "PUSHING_BACK";
+      target.y = 48;
+      pilotSpeak(target.callsign, `Pushback approved, ${target.callsign}.`, target.pitch);
+    } else if (cmd.includes("taxi")) {
+      target.state = "TAXIING";
+      target.speed = 0.6;
+      pilotSpeak(target.callsign, `Taxi to runway ${rwy}, ${target.callsign}.`, target.pitch);
+    } else if (cmd.includes("line up") || cmd.includes("position and hold")) {
+      target.state = "LINED_UP";
+      target.x = -165;
+      target.y = 0;
+      target.speed = 0;
+      pilotSpeak(target.callsign, `Line up and wait runway ${rwy}, ${target.callsign}.`, target.pitch);
+    } else if (cmd.includes("takeoff") || cmd.includes("take off") || cmd.includes("departure")) {
+      target.state = "TAKEOFF_ROLL";
+      target.x = -165;
+      target.y = 0;
+      target.speed = 0.8;
+      pilotSpeak(target.callsign, `Cleared for takeoff runway ${rwy}, ${target.callsign}.`, target.pitch);
+    } else if (cmd.includes("land")) {
+      target.state = "CLEARED_LAND";
+      pilotSpeak(target.callsign, `Cleared to land runway ${rwy}, ${target.callsign}.`, target.pitch);
+    } else if (cmd.includes("go around") || cmd.includes("missed")) {
+      target.state = "GO_AROUND";
+      target.speed = 2.2;
+      pilotSpeak(target.callsign, `Going around, ${target.callsign}.`, target.pitch);
+    } else if (cmd.includes("hold short")) {
+      target.state = "HOLDING_SHORT";
+      target.speed = 0;
+      pilotSpeak(target.callsign, `Holding short runway ${rwy}, ${target.callsign}.`, target.pitch);
+    } else {
+      pilotSpeak(target.callsign, `Say again for ${target.callsign}?`, target.pitch);
+    }
+
+    updateStrips();
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      isListening = true;
+      pttBtn.classList.add("listening");
+      pttBtn.textContent = "🔴 Transmitting... Speak Clearance";
+      voiceStatus.textContent = "TX ACTIVE";
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      processATCCommand(transcript);
+    };
+
+    recognition.onerror = (e) => {
+      addLog("SYSTEM", `Mic notice: ${e.error}. You can also type commands below.`);
+    };
+
+    recognition.onend = () => {
+      isListening = false;
+      pttBtn.classList.remove("listening");
+      pttBtn.textContent = "🎙️ Hold Space or Click to Talk (PTT)";
+      voiceStatus.textContent = "Mic Ready";
+    };
+  } else {
+    voiceStatus.textContent = "Voice Unsupported";
+    addLog("SYSTEM", "SpeechRecognition API not supported in this browser. Use text input below.");
+  }
+
+  function startPTT() {
+    if (recognition && !isListening) {
+      try { recognition.start(); } catch (e) {}
+    }
+  }
+
+  function stopPTT() {
+    if (recognition && isListening) {
+      try { recognition.stop(); } catch (e) {}
+    }
+  }
+
+  pttBtn.addEventListener("mousedown", startPTT);
+  pttBtn.addEventListener("mouseup", stopPTT);
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && document.activeElement.tagName !== "INPUT") {
+      e.preventDefault();
+      startPTT();
+    }
+  });
+  window.addEventListener("keyup", (e) => {
+    if (e.code === "Space" && document.activeElement.tagName !== "INPUT") {
+      stopPTT();
+    }
+  });
+
+  document.getElementById("sendCmdBtn").addEventListener("click", () => {
+    const input = document.getElementById("cmdInput");
+    processATCCommand(input.value);
+    input.value = "";
+  });
+
+  document.getElementById("cmdInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      processATCCommand(e.target.value);
+      e.target.value = "";
+    }
+  });
+
+  document.getElementById("airportSelect").addEventListener("change", (e) => {
+    const code = e.target.value;
+    currentAirport = AIRPORTS[code];
+    document.getElementById("airportBadge").textContent = `${code} • ${currentAirport.name.toUpperCase()}`;
+    document.getElementById("activeRwyHud").textContent = currentAirport.rwy;
+    aircraftList = [];
+    updateStrips();
+    addLog("SYSTEM", `Switched frequency to ${currentAirport.name} (${code}).`);
+    spawnAircraft("DEPARTURE");
+    spawnAircraft("ARRIVAL");
+  });
+
+  document.getElementById("spawnBtn").addEventListener("click", () => spawnAircraft());
+
+  function updateAndDraw() {
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Draw Radar Range Rings
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.12)";
+    ctx.lineWidth = 1;
+    [120, 240, 360].forEach(r => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+
+    // Draw Extended Centerline
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(cx - 420, cy);
+    ctx.lineTo(cx + 420, cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw Taxiway & Apron
+    ctx.strokeStyle = "#2b3a4a";
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(cx - 165, cy);
+    ctx.lineTo(cx - 165, cy + 50);
+    ctx.lineTo(cx + 120, cy + 50);
+    ctx.stroke();
+
+    // Draw Main Runway
+    ctx.fillStyle = "#1e293b";
+    ctx.strokeStyle = "#64748b";
+    ctx.lineWidth = 2;
+    ctx.fillRect(cx - 180, cy - 12, 360, 24);
+    ctx.strokeRect(cx - 180, cy - 12, 360, 24);
+
+    // Runway Centerline & Numbers
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "bold 12px monospace";
+    ctx.fillText(currentAirport.rwy, cx - 172, cy + 4);
+
+    // Update & Draw Aircraft
+    aircraftList = aircraftList.filter(ac => {
+      if (ac.state === "TAXIING") {
+        if (ac.x > -165) ac.x -= ac.speed;
+        else {
+          ac.state = "HOLDING_SHORT";
+          ac.y = 26;
+          pilotSpeak(ac.callsign, `Holding short runway ${currentAirport.rwy}, ready for departure, ${ac.callsign}.`, ac.pitch);
+          updateStrips();
+        }
+      } else if (ac.state === "TAKEOFF_ROLL") {
+        ac.speed = Math.min(ac.speed + 0.03, 3.2);
+        ac.x += ac.speed;
+        if (ac.x > 40) ac.altitude += 18;
+        if (ac.x > 420) {
+          pilotSpeak(ac.callsign, `Contacting departure, good day, ${ac.callsign}.`, ac.pitch);
+          return false;
+        }
+      } else if (ac.state === "FINAL_APPROACH" || ac.state === "CLEARED_LAND") {
+        ac.x -= ac.speed;
+        ac.altitude = Math.max(0, (ac.x + 150) * 6.5);
+        if (ac.x < 185 && ac.state === "FINAL_APPROACH") {
+          ac.state = "GO_AROUND";
+          pilotSpeak(ac.callsign, `Going around, no landing clearance received, ${ac.callsign}!`, ac.pitch);
+          updateStrips();
+        } else if (ac.x <= 0 && ac.state === "CLEARED_LAND") {
+          ac.speed = Math.max(0.4, ac.speed - 0.02);
+          if (ac.x < -140) {
+            pilotSpeak(ac.callsign, `Clear of the runway, ${ac.callsign}.`, ac.pitch);
+            return false;
+          }
+        }
+      } else if (ac.state === "GO_AROUND") {
+        ac.x -= 2.4;
+        ac.y -= 0.7;
+        ac.altitude += 25;
+        if (ac.x < -420) return false;
+      }
+
+      const px = cx + ac.x;
+      const py = cy + ac.y;
+
+      // Aircraft Target Icon
+      ctx.fillStyle = ac.type === "DEPARTURE" ? "#22c55e" : "#f59e0b";
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Data Tag
+      ctx.fillStyle = "#f8fafc";
+      ctx.font = "11px monospace";
+      ctx.fillText(ac.callsign, px + 8, py - 4);
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillText(`${ac.state.replace(/_/g, " ")}`, px + 8, py + 8);
+
+      return true;
+    });
+
+    requestAnimationFrame(updateAndDraw);
+  }
+
+  addLog("SYSTEM", "Welcome to Towerline Sim. Hold SPACE or click PTT to transmit clearances.");
+  spawnAircraft("DEPARTURE");
+  setTimeout(() => spawnAircraft("ARRIVAL"), 3500);
+  updateAndDraw();
+</script>
+</body>
+</html>
